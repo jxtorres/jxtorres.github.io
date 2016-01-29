@@ -9,11 +9,8 @@
     var turnPoint = new Phaser.Point();
     var directions = [null, null, null, null, null];
     var opposites = [Phaser.NONE, Phaser.RIGHT, Phaser.LEFT, Phaser.DOWN, Phaser.UP];
-    var Zombie1 = null;
-    var Zombie2 = null;
-    var Zombie3 = null;
-    var Zombie4 = null;
-    var Zombie5 = null;
+    var Zombies = [];
+    
     var player = null;
     var speed = 150;
     var speed2 = 150;
@@ -22,6 +19,13 @@
     var turning = null;
     var spaceKey = null;
     var baddieCounter = 5;
+
+    var musicPlayNormal, musicLevelComplete, musicDead, musicBoom, musicSplat, musicBump;
+    
+    for(var i = 0; i < baddieCounter; ++i)
+    {
+        Zombies[i] = null;
+    }
     
     // note: graphics copyright 2015 Photon Storm Ltd
     function preload() {
@@ -31,7 +35,25 @@
         game.load.spritesheet('baddie', 'assets/baddie.png', 32,32);
         game.load.spritesheet('dude', 'assets/dude.png', 32, 48);
         game.load.spritesheet('explosion', 'assets/explosion17.png', 64, 64);
+        game.load.audio('musicPN', 'assets/audio/-003-game-play-normal-.mp3');
+        game.load.audio('musicLC', 'assets/audio/-005-level-complete.mp3');
+        game.load.audio('musicDead', 'assets/audio/-009-dead.mp3');
+        game.load.audio('musicDead', 'assets/audio/-009-dead.mp3');
+        game.load.audio('musicBoom', 'assets/audio/bomb-03.mp3');
+        game.load.audio('musicSplat', 'assets/audio/splat.mp3');
+        game.load.audio('musicBump', 'assets/audio/bump-cut.mp3');
     }
+    
+    function Zombie(sprite) {
+        this.sprite = sprite
+        
+   
+    }
+    
+    Zombie.prototype.Act = function() {
+        
+    }
+    
     
     function create() {
         map = game.add.tilemap('map');
@@ -39,21 +61,33 @@
         layer = map.createLayer('Tile Layer 1');
         map.setCollision(6, true, this.layer);
         
-        Zombie1 = makeZombie(32*5.5, 32*rand(1, 14));
-        Zombie2 = makeZombie(32*5.5, 32*rand(1, 14));
-        Zombie3 = makeZombie(32*5.5, 32*rand(1, 14));
-        Zombie4 = makeZombie(32*rand(4, 18), 32*4.5);
-        Zombie5 = makeZombie(32*rand(4, 18), 32*4.5);
-        Zombie1.body.velocity.x = speed2;
-        Zombie2.body.velocity.x = speed2;
-        Zombie3.body.velocity.x = speed2;
-        Zombie4.body.velocity.y = speed2;
-        Zombie5.body.velocity.y = -speed2;
-        Zombie1.animations.play('right');
-        Zombie2.animations.play('right');
-        Zombie3.animations.play('right');
-        Zombie4.animations.play('right');
-        Zombie5.animations.play('right');
+        for(var i = 0; i < baddieCounter; ++i)
+        {
+            if(i < 3)
+            {
+                Zombies[i] = makeZombie(32*5.5, 32*rand(1, 14));
+                Zombies[i].body.velocity.x = speed2;
+            }
+            else
+            {
+                Zombies[i] = makeZombie(32*rand(4,18),32*4.5);
+                Zombies[i].body.velocity.y = (i == 4) ? -speed2 : speed2;
+            }
+            Zombies[i].animations.play('right');
+        }
+        
+        musicPlayNormal = game.add.audio('musicPN');
+        musicLevelComplete = game.add.audio('musicLC');
+        musicDead = game.add.audio('musicDead');
+        musicBoom = game.add.audio('musicBoom');
+        musicSplat = game.add.audio('musicSplat');
+        musicBump = game.add.audio('musicBump');
+
+        musicBoom.volume = 0.15;
+        musicSplat.volume = 0.7;
+        musicBump.volume = 0.3;
+        musicPlayNormal.loop = true;
+        musicPlayNormal.play();
      
         player = game.add.sprite(48, 48, 'dude', 4);
         player.animations.add('left', [0, 1, 2, 3], 10, true);
@@ -65,18 +99,20 @@
         cursors = game.input.keyboard.createCursorKeys();
         spaceKey = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
         
-        spaceKey.onDown.add(function(){
-            var bomb = game.add.sprite(marker.x * 32 + 16, marker.y * 32 + 16, 'bomb', 0);
-            bomb.anchor.set(0.5);
-            bomb.scale.set(.40, .30);
-            setTimeout(function() {                
-                fallout(bomb);
-                setTimeout(function() {
-                    fallout(bomb);
-                }, 25);
-                boom(bomb);
-                bomb.destroy();
-            }, 1000);        
+        spaceKey.onDown.add(function() {
+        	if(player.alive) {
+	            var bomb = game.add.sprite(marker.x * 32 + 16, marker.y * 32 + 16, 'bomb', 0);
+	            bomb.anchor.set(0.5);
+	            bomb.scale.set(.40, .30);
+	            setTimeout(function() {                
+	                fallout(bomb);
+	                setTimeout(function() {
+	                    fallout(bomb);
+	                }, 25);
+	                boom(bomb);
+	                bomb.destroy();
+	            }, 1000);        
+	        }
         }, this);
     }
     
@@ -103,12 +139,10 @@
         if(!player.alive) {  endGame("lose"); }
             
         // check for collisions
-        game.physics.arcade.collide(player, layer);
-        hitBaddie(Zombie1);
-        hitBaddie(Zombie2);
-        hitBaddie(Zombie3);
-        hitBaddie(Zombie4);
-        hitBaddie(Zombie5);
+        game.physics.arcade.collide(player, layer, function() { /*musicBump.play();*/ });
+        
+        for(var i = 0; i < baddieCounter; ++i)
+            hitBaddie(Zombies[i]);
         
         marker.x = game.math.snapToFloor(Math.floor(player.x), 32) / 32;
         marker.y = game.math.snapToFloor(Math.floor(player.y), 32) / 32;
@@ -138,19 +172,40 @@
         checkWin();
     }
     
+    function anyZombiesAlive() {
+        var answer = false;
+        for(var i = 0; i < baddieCounter; ++i)
+            if(Zombies[i].alive)
+                answer = true;
+        return answer;
+        
+    }
+    
     function checkWin() {
-        if(!Zombie1.alive && !Zombie2.alive && !Zombie3.alive
-            && !Zombie4.alive && !Zombie5.alive)
+
+        if(!anyZombiesAlive() && player.alive)
             endGame("win");
+    }
+    
+    function spriteEquals(sprite1, sprite2){
+        return sprite1 === sprite2;
+    }
+    
+    function isAZombie(sprite){
+        for(var i = 0; i < baddieCounter; i++){
+            if(spriteEquals(sprite, Zombies[i]))
+                return true;
+        }
+        return false;
     }
     
     function hitBaddie(sprite) {
         // set sprite collision
         game.physics.arcade.collide(sprite, layer);
         
-        if(sprite === Zombie1 || sprite === Zombie2 || sprite === Zombie3 ||
-                sprite === Zombie4 || sprite === Zombie5) {
+        if(isAZombie(sprite)) {
             game.physics.arcade.overlap(player, sprite, function() {
+                musicSplat.play();
                 player.kill();
             }, null, game);
         }
@@ -174,6 +229,8 @@
     
     //Pass this function a bomb!!!
     function boom(b){
+        musicBoom.play();
+
         var fireSprites = [];
         var x = getTileCoord(b).x;
         var y = getTileCoord(b).y;
@@ -206,54 +263,56 @@
         }	
     }
     
+
     function AnimateZombie(){
-        var point = getTileCoord(Zombie1);
-        var point2 = getTileCoord(Zombie2);
-        var point3 = getTileCoord(Zombie3);
-        var point4 = getTileCoord(Zombie4);
-        var point5 = getTileCoord(Zombie5);
-        if(point.x===3){
-            Zombie1.animations.play('right');
-            Zombie1.body.velocity.x = speed2;
-        }
-        if(point.x===15) {
-            Zombie1.animations.play('left');
-            Zombie1.body.velocity.x = -speed2;
-        }
-        if(point2.x===5){
-            Zombie2.animations.play('right');
-            Zombie2.body.velocity.x = speed2;
-        }
-        if(point2.x===18) {
-            Zombie2.animations.play('left');
-            Zombie2.body.velocity.x = -speed2;
-        }
-        if(point3.x===2){
-            Zombie3.animations.play('right');
-            Zombie3.body.velocity.x = speed2;
-        }
-        if(point3.x===9)
+        for(var i = 0; i < baddieCounter; ++i)
         {
-            Zombie3.animations.play('left');
-            Zombie3.body.velocity.x = -speed2;
-        }
-        if(point4.y===3){
-            Zombie4.animations.play('right');
-            Zombie4.body.velocity.y = speed2;
-        }
-        if(point4.y===12)
-        {
-            Zombie4.animations.play('left');
-            Zombie4.body.velocity.y = -speed2;
-        }
-        if(point5.y===4){
-            Zombie5.animations.play('right');
-            Zombie5.body.velocity.y = speed2;
-        }
-        if(point5.y===11)
-        {
-            Zombie5.animations.play('left');
-            Zombie5.body.velocity.y = -speed2;
+            var point = getTileCoord(Zombies[i]);
+        
+            if(point.x===3 && i == 0){
+                Zombies[i].animations.play('right');
+                Zombies[i].body.velocity.x = speed2;
+            }
+            if(point.x===15 && i == 0) {
+                Zombies[i].animations.play('left');
+                Zombies[i].body.velocity.x = -speed2;
+            }
+            if(point.x===5 && i == 1){
+                Zombies[i].animations.play('right');
+                Zombies[i].body.velocity.x = speed2;
+            }
+            if(point.x===18 && i == 1) {
+                Zombies[i].animations.play('left');
+                Zombies[i].body.velocity.x = -speed2;
+            }
+            if(point.x===2 && i == 2){
+                Zombies[i].animations.play('right');
+                Zombies[i].body.velocity.x = speed2;
+            }
+            if(point.x===9 && i == 2)
+            {
+                Zombies[i].animations.play('left');
+                Zombies[i].body.velocity.x = -speed2;
+            }
+            if(point.y===3 && i == 3){
+                Zombies[i].animations.play('right');
+                Zombies[i].body.velocity.y = speed2;
+            }
+            if(point.y===12 && i == 3)
+            {
+                Zombies[i].animations.play('left');
+                Zombies[i].body.velocity.y = -speed2;
+            }
+            if(point.y===4 && i == 4){
+                Zombies[i].animations.play('right');
+                Zombies[i].body.velocity.y = speed2;
+            }
+            if(point.y===11 && i == 4)
+            {
+                Zombies[i].animations.play('left');
+                Zombies[i].body.velocity.y = -speed2;
+            }
+
         }
     }
     
@@ -334,7 +393,15 @@
     }
     
     function endGame(status) {
+
+    	game.input.keyboard.removeKeyCapture(Phaser.Keyboard.SPACEBAR);
+        
+
+        musicPlayNormal.stop();
+
         game.paused = true;
+        game.sound.mute = false;
+        clearAllTimeout();
         var text = game.add.text(0, game.camera.height / 3, "", {
             font: "129px Arial",
             fill: "#ffffff",
@@ -342,37 +409,40 @@
         });
         text.fixedToCamera = false;
         if(status === "win") {
+            musicLevelComplete.play();
             text.setText("You win!!!!!!");
         } else {
+            musicDead.play();
             text.setText("Game Over");        
         }
         setTimeout(function() {
             text.setText("");
+            musicLevelComplete.stop();
+            musicDead.stop();
             create();
             game.paused = false;
-        }, 2500);
+        }, 3000);
     }
     
     function fallout(b) {
         marker.x = game.math.snapToFloor(Math.floor(b.x), 32);
         marker.y = game.math.snapToFloor(Math.floor(b.y), 32);
         
-        checkFallout(Zombie1);
-        checkFallout(Zombie2);
-        checkFallout(Zombie3);
-        checkFallout(Zombie4);
-        checkFallout(Zombie5);
+        for(var i = 0; i < baddieCounter; ++i)
+            checkFallout(Zombies[i]);
         checkFallout(player);
     }
     
     function checkFallout(sprite) {
         if(sprite.body.y >= marker.y && sprite.y <= (marker.y + 32)) {
-            if(sprite.body.x > (marker.x - 64) && sprite.body.x < (marker.x + 64)) {
+            if(sprite.body.x > (marker.x - 64) && sprite.body.x < (marker.x + 64) && sprite.alive) {
+                musicSplat.play();
                 sprite.kill();
             }
         }
         if(sprite.body.x >= marker.x && sprite.x <= (marker.x + 32)) {
-            if(sprite.body.y > (marker.y - 64) && sprite.body.y < (marker.y + 64)) {
+            if(sprite.body.y > (marker.y - 64) && sprite.body.y < (marker.y + 64) && sprite.alive) {
+                musicSplat.play();
                 sprite.kill();
             }
         }
